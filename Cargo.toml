@@ -30,3 +30,8 @@ version = "0.1.0"
 
 
 [workspace.dependencies]
+anyhow = "1"
+russh = "0.62"
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"]}
