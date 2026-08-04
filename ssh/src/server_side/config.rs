@@ -107,7 +107,7 @@ fn authentication_methods() -> MethodSet {
 
 fn load_private_key(private_key_path: impl AsRef<Path>) -> Result<PrivateKey, ServerError> {
     load_secret_key(private_key_path.as_ref(), None)
-        .map_err(|error| ServerError::KeyError { source: error })
+        .map_err(|error| ServerError::Key { source: error })
 }
 
 fn allowed_ssh_algorithms() -> Preferred {

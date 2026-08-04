@@ -16,8 +16,7 @@ exclude = [""]
 homepage = ""
 include = [""]
 keywords = [""]
-license = ""
-license-file = ""
+license = "MIT"
 publish = false
 readme = ""
 repository = ""
@@ -35,3 +34,7 @@ russh = "0.62"
 thiserror = "2"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"]}
+tokio = { version = "1", features = ["full"]}
+argon2 = { version = "0.5", features = ["std"]}
+rand_core = "0.10"
+rpassword = "7"

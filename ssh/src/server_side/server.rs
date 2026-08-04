@@ -27,6 +27,6 @@ impl russh::server::Server for SshServer {
 
     fn new_client(&mut self, peer_addr: Option<std::net::SocketAddr>) -> Self::Handler {
         let connection_id = self.connection_id();
-        ConnectionHandler::new(connection_id)
+        ConnectionHandler::new(connection_id, peer_addr)
     }
 }
