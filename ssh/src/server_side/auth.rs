@@ -2,6 +2,7 @@ use argon2::{
     Argon2, PasswordHash, PasswordHasher, PasswordVerifier,
     password_hash::{SaltString, rand_core::OsRng},
 };
+use russh::keys::{PublicKey, ssh_key::authorized_keys};
 
 use crate::server_side::{
     error::ServerError,
@@ -22,21 +23,27 @@ pub fn verify_password_hash(password: &str, password_hash: &str) -> Result<(), S
     Ok(Argon2::default().verify_password(password.as_bytes(), &parsed_hash)?)
 }
 
-pub fn admin_authentication(username: &str, password: &str) -> bool {
+pub fn admin_password_authentication(username: &str, password: &str) -> bool {
     username == DEVELOPMENT_USERNAME
         && verify_password_hash(password, DEVELOPMENT_PASSWORD_HASH).is_ok()
 }
 
+pub fn check_admin_public_key(authorized_keys: &[PublicKey], key_to_check: &PublicKey) -> bool {
+    authorized_keys
+        .iter()
+        .any(|key| key.key_data() == key_to_check.key_data())
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::server_side::auth::admin_authentication;
+    use crate::server_side::auth::admin_password_authentication;
 
     #[test]
     fn validate_admin() {
         let username = "admin";
         let password = "admin";
 
-        assert!(admin_authentication(username, password));
+        assert!(admin_password_authentication(username, password));
     }
 
     #[test]
@@ -44,13 +51,13 @@ mod tests {
         let username = "unknown";
         let password = "password";
 
-        assert!(!admin_authentication(username, password));
+        assert!(!admin_password_authentication(username, password));
     }
 
     #[test]
     fn reject_admin_wrong_password() {
         let username = "admin";
         let password = "asdasdasd";
-        assert!(!admin_authentication(username, password));
+        assert!(!admin_password_authentication(username, password));
     }
 }

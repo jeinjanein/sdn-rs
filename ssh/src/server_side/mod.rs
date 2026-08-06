@@ -2,6 +2,8 @@ pub mod auth;
 pub mod config;
 pub mod error;
 pub mod handler;
+pub mod permissions;
+pub mod resources;
 pub mod security;
 pub mod server;
 pub mod shutdown;

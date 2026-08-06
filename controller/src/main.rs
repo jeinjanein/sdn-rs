@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
-use russh::server::Server;
+use russh::{
+    keys::{PublicKey, load_public_key},
+    server::Server,
+};
 use ssh::server_side::{config::create_server_config, server::SshServer};
 use tokio::net::TcpListener;
 use tracing::info;
@@ -11,6 +14,8 @@ const HOST_PRIVATE_KEY_PATH: &str = "./keys/admin_ed25519_key";
 
 const HOST_ADDRESS: &str = "127.0.0.1:2222";
 
+const HOST_PUBLIC_KEY_PATH: &str = "./keys/admin_ed25519_key.pub";
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     logging::initialize();
@@ -20,7 +25,9 @@ async fn main() -> anyhow::Result<()> {
     let bind_address = TcpListener::bind(HOST_ADDRESS).await?;
     info!("SSH server is listening");
 
-    let mut ssh_server = SshServer::new();
+    let admin_public_key = load_public_key(HOST_PUBLIC_KEY_PATH)?;
+
+    let mut ssh_server = SshServer::new(vec![admin_public_key]);
 
     let mut running_server = ssh_server.run_on_socket(config, &bind_address);
 

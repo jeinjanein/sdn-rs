@@ -1,16 +1,23 @@
-use std::sync::atomic::AtomicU64;
+use std::sync::{Arc, atomic::AtomicU64};
 
-use crate::server_side::handler::ConnectionHandler;
+use russh::keys::PublicKey;
+use tracing::warn;
+
+use crate::server_side::{
+    error::ServerError, handler::ConnectionHandler, resources::ServerResources,
+};
 
 #[derive(Debug)]
 pub struct SshServer {
     next_connection_id: AtomicU64,
+    server_resources: Arc<ServerResources>,
 }
 
 impl SshServer {
-    pub fn new() -> Self {
+    pub fn new(authorized_public_keys: Vec<PublicKey>) -> Self {
         Self {
             next_connection_id: AtomicU64::new(0),
+            server_resources: Arc::new(ServerResources::new(authorized_public_keys)),
         }
     }
 
@@ -25,6 +32,13 @@ impl russh::server::Server for SshServer {
 
     fn new_client(&mut self, peer_addr: Option<std::net::SocketAddr>) -> Self::Handler {
         let connection_id = self.connection_id();
-        ConnectionHandler::new(connection_id, peer_addr)
+        ConnectionHandler::new(connection_id, peer_addr, Arc::clone(&self.server_resources))
+    }
+
+    fn handle_session_error(&mut self, error: ServerError) {
+        warn!(
+            %error,
+            "SSH client ended with an error"
+        )
     }
 }
