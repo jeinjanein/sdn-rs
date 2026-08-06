@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod channel;
 pub mod config;
 pub mod error;
 pub mod handler;

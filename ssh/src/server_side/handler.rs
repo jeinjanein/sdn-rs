@@ -1,22 +1,24 @@
-use russh::{keys::ssh_key::authorized_keys, server::Auth};
-use std::{net::SocketAddr, sync::Arc};
+use russh::{ChannelId, keys::ssh_key::authorized_keys, server::Auth};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tracing::{debug, info};
 
 use crate::server_side::{
     auth::{admin_password_authentication, check_admin_public_key},
+    channel::ChannelData,
     error::ServerError,
     permissions::Permissions,
     resources::ServerResources,
     security::DEVELOPMENT_USERNAME,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ConnectionHandler {
     connection_id: u64,
     peer_addr: Option<SocketAddr>,
     authenticated_username: Option<String>,
     permissions: Option<Permissions>,
     server_resources: Arc<ServerResources>,
+    channels: HashMap<ChannelId, ChannelData>,
 }
 
 impl ConnectionHandler {
@@ -31,6 +33,7 @@ impl ConnectionHandler {
             authenticated_username: None,
             permissions: None,
             server_resources,
+            channels: HashMap::new(),
         }
     }
 
@@ -70,7 +73,7 @@ impl russh::server::Handler for ConnectionHandler {
                     "admin authenticated"
                 );
 
-                self.record_authenticated_identity(username, Permissions::Administrative);
+                self.record_authenticated_identity(username, Permissions::Administrator);
 
                 return Ok(Auth::Accept);
             }
@@ -140,7 +143,7 @@ impl russh::server::Handler for ConnectionHandler {
                     "public key authenticated"
                 );
 
-                self.record_authenticated_identity(username, Permissions::Administrative);
+                self.record_authenticated_identity(username, Permissions::Administrator);
 
                 return Ok(Auth::Accept);
             }
