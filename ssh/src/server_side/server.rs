@@ -1,7 +1,5 @@
 use std::sync::atomic::AtomicU64;
 
-use russh::server;
-
 use crate::server_side::handler::ConnectionHandler;
 
 #[derive(Debug)]

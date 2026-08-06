@@ -2,7 +2,7 @@ use std::{error::Error, io::ErrorKind};
 
 use argon2::{
     Argon2, PasswordHasher,
-    password_hash::{self, SaltString, rand_core::OsRng},
+    password_hash::{SaltString, rand_core::OsRng},
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
