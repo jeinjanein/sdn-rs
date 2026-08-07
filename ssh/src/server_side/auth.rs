@@ -9,6 +9,12 @@ use crate::server_side::{
     security::{DEVELOPMENT_PASSWORD_HASH, DEVELOPMENT_USERNAME},
 };
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AuthenticationMethods {
+    Password,
+    PublicKey,
+}
+
 fn hash_password(password: &str) -> Result<String, ServerError> {
     let salt = SaltString::generate(&mut OsRng);
 

@@ -3,7 +3,7 @@ use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tracing::{debug, info};
 
 use crate::server_side::{
-    auth::{admin_password_authentication, check_admin_public_key},
+    auth::{AuthenticationMethods, admin_password_authentication, check_admin_public_key},
     channel::ChannelData,
     error::ServerError,
     permissions::Permissions,
@@ -17,6 +17,7 @@ pub struct ConnectionHandler {
     peer_addr: Option<SocketAddr>,
     authenticated_username: Option<String>,
     permissions: Option<Permissions>,
+    authentication_method: Option<AuthenticationMethods>,
     server_resources: Arc<ServerResources>,
     channels: HashMap<ChannelId, ChannelData>,
 }
@@ -31,6 +32,7 @@ impl ConnectionHandler {
             connection_id,
             peer_addr,
             authenticated_username: None,
+            authentication_method: None,
             permissions: None,
             server_resources,
             channels: HashMap::new(),
@@ -54,6 +56,10 @@ impl ConnectionHandler {
 
         self.permissions = Some(permissions);
     }
+
+    pub fn record_authentication_method(&mut self, method: AuthenticationMethods) {
+        self.authentication_method = Some(method)
+    }
 }
 
 impl russh::server::Handler for ConnectionHandler {
@@ -75,12 +81,15 @@ impl russh::server::Handler for ConnectionHandler {
 
                 self.record_authenticated_identity(username, Permissions::Administrator);
 
+                self.record_authentication_method(AuthenticationMethods::Password);
+
                 return Ok(Auth::Accept);
             }
 
             info!(
                 connection_id = self.connection_id,
-                peer_address = ?&self.peer_addr,
+                peer_address = ?self.peer_addr,
+                authentication_method = ?self.authentication_method,
                 username,
                 "wrong password"
             );
@@ -135,15 +144,18 @@ impl russh::server::Handler for ConnectionHandler {
             let authorized_keys = self.server_resources.authorized_public_keys();
 
             if check_admin_public_key(authorized_keys, public_key) {
+                self.record_authenticated_identity(username, Permissions::Administrator);
+
+                self.record_authentication_method(AuthenticationMethods::PublicKey);
+
                 info!(
                     connection_id = self.connection_id,
                     peer_address = ?self.peer_addr,
                     username,
+                    authentication_method = ?self.authentication_method,
                     public_key_fingerprint = %fingerprint,
                     "public key authenticated"
                 );
-
-                self.record_authenticated_identity(username, Permissions::Administrator);
 
                 return Ok(Auth::Accept);
             }
