@@ -9,6 +9,7 @@ use crate::server_side::{
     permissions::Permissions,
     resources::ServerResources,
     security::DEVELOPMENT_USERNAME,
+    subsystem::Subsystem,
 };
 
 #[derive(Debug)]
@@ -18,6 +19,7 @@ pub struct ConnectionHandler {
     authenticated_username: Option<String>,
     permissions: Option<Permissions>,
     authentication_method: Option<AuthenticationMethods>,
+    access_subsystem: Option<Subsystem>,
     server_resources: Arc<ServerResources>,
     channels: HashMap<ChannelId, ChannelData>,
 }
@@ -35,6 +37,7 @@ impl ConnectionHandler {
             authentication_method: None,
             permissions: None,
             server_resources,
+            access_subsystem: None,
             channels: HashMap::new(),
         }
     }
@@ -51,6 +54,26 @@ impl ConnectionHandler {
         self.authenticated_username.as_deref()
     }
 
+    pub fn permissions(&self) -> Option<Permissions> {
+        self.permissions
+    }
+
+    pub fn authentication_method(&self) -> Option<AuthenticationMethods> {
+        self.authentication_method
+    }
+
+    pub fn access_subsystem(&self) -> Option<Subsystem> {
+        self.access_subsystem
+    }
+
+    pub fn server_resources(&self) -> Arc<ServerResources> {
+        Arc::clone(&self.server_resources)
+    }
+
+    pub fn channels(&self) -> &HashMap<ChannelId, ChannelData> {
+        &self.channels
+    }
+
     pub fn record_authenticated_identity(&mut self, username: &str, permissions: Permissions) {
         self.authenticated_username = Some(username.to_owned());
 
@@ -59,6 +82,10 @@ impl ConnectionHandler {
 
     pub fn record_authentication_method(&mut self, method: AuthenticationMethods) {
         self.authentication_method = Some(method)
+    }
+
+    pub fn is_authorized_to_access_subsystem(&self) -> bool {
+        self.permissions.is_some()
     }
 }
 
@@ -170,5 +197,41 @@ impl russh::server::Handler for ConnectionHandler {
         );
 
         Ok(Auth::reject())
+    }
+
+    async fn subsystem_request(
+        &mut self,
+        channel: ChannelId,
+        name: &str,
+        session: &mut russh::server::Session,
+    ) -> Result<(), Self::Error> {
+        if self.is_authorized_to_access_subsystem() {
+            if name == "netconf" {
+                info!(
+                    connection_id = self.connection_id,
+                    peer_address = ?self.peer_addr,
+                    channel_id = ?channel,
+                    "netconf subsystem authorized"
+                );
+                session.channel_success(channel)?;
+            } else {
+                info!(
+                    connection_id = self.connection_id,
+                    peer_address = ?self.peer_addr,
+                    channel_id = ?channel,
+                    "unknown subsystem rejected"
+                );
+                session.channel_failure(channel)?;
+            }
+        } else {
+            info!(
+                connection_id = self.connection_id,
+                peer_address = ?self.peer_addr,
+                channel_id = ?channel,
+                "access to subsystem denied"
+            );
+        }
+
+        Ok(())
     }
 }
