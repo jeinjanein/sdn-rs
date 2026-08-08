@@ -1,10 +1,10 @@
-use russh::{ChannelId, keys::ssh_key::authorized_keys, server::Auth};
+use russh::{ChannelId, ChannelOpenFailure, keys::ssh_key::authorized_keys, server::Auth};
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 use crate::server_side::{
     auth::{AuthenticationMethods, admin_password_authentication, check_admin_public_key},
-    channel::ChannelData,
+    channel::{ChannelData, MAXIMUM_SESSION_CHANNELS_PER_CONNECTION},
     error::ServerError,
     permissions::Permissions,
     resources::ServerResources,
@@ -74,6 +74,10 @@ impl ConnectionHandler {
         &self.channels
     }
 
+    pub fn channel_count(&self) -> usize {
+        self.channels.len()
+    }
+
     pub fn record_authenticated_identity(&mut self, username: &str, permissions: Permissions) {
         self.authenticated_username = Some(username.to_owned());
 
@@ -86,6 +90,14 @@ impl ConnectionHandler {
 
     pub fn is_authorized_to_access_subsystem(&self) -> bool {
         self.permissions.is_some()
+    }
+
+    pub fn record_authorized_to_access_subsystem(&mut self, subsystem: Subsystem) {
+        self.access_subsystem = Some(subsystem);
+    }
+
+    pub fn may_accept_another_session_channel(&self) -> bool {
+        self.channel_count() < MAXIMUM_SESSION_CHANNELS_PER_CONNECTION
     }
 }
 
@@ -199,6 +211,47 @@ impl russh::server::Handler for ConnectionHandler {
         Ok(Auth::reject())
     }
 
+    async fn channel_open_session(
+        &mut self,
+        channel: russh::Channel<russh::server::Msg>,
+        reply: russh::server::ChannelOpenHandle,
+        session: &mut russh::server::Session,
+    ) -> Result<(), Self::Error> {
+        let channel_id = channel.id();
+
+        if !self.may_accept_another_session_channel() {
+            reply.reject(ChannelOpenFailure::ResourceShortage).await;
+
+            warn!(
+                connection_id = self.connection_id,
+                peer_address = ?self.peer_addr,
+                ?channel_id,
+                current_channel_count = self.channel_count(),
+                maximum_session_channels = MAXIMUM_SESSION_CHANNELS_PER_CONNECTION,
+                "session reached channel limit"
+            );
+
+            return Ok(());
+        }
+
+        reply.accept().await;
+
+        let channel_data = ChannelData::new();
+
+        self.channels.insert(channel_id, channel_data);
+
+        info!(
+            connection_id = self.connection_id,
+            peer_address = ?self.peer_addr,
+            ?channel_id,
+            current_channel_count = self.channel_count(),
+            maximum_session_channels = MAXIMUM_SESSION_CHANNELS_PER_CONNECTION,
+            "new session channel accepted"
+        );
+
+        Ok(())
+    }
+
     async fn subsystem_request(
         &mut self,
         channel: ChannelId,
@@ -213,6 +266,7 @@ impl russh::server::Handler for ConnectionHandler {
                     channel_id = ?channel,
                     "netconf subsystem authorized"
                 );
+                self.record_authorized_to_access_subsystem(Subsystem::Netconf);
                 session.channel_success(channel)?;
             } else {
                 info!(
@@ -230,8 +284,154 @@ impl russh::server::Handler for ConnectionHandler {
                 channel_id = ?channel,
                 "access to subsystem denied"
             );
+            session.channel_failure(channel)?;
         }
 
         Ok(())
+    }
+
+    async fn agent_request(
+        &mut self,
+        channel: ChannelId,
+        session: &mut russh::server::Session,
+    ) -> Result<bool, Self::Error> {
+        info!(
+            connection_id = self.connection_id,
+            peer_address = ?self.peer_addr,
+            channel_id = ?channel,
+            reject_reason = "feature is unsupported",
+            "agent request denied",
+        );
+        session.channel_failure(channel)?;
+
+        Ok(false)
+    }
+
+    async fn env_request(
+        &mut self,
+        channel: ChannelId,
+        variable_name: &str,
+        _variable_value: &str,
+        session: &mut russh::server::Session,
+    ) -> Result<(), Self::Error> {
+        info!(
+            connection_id = self.connection_id,
+            peer_address = ?self.peer_addr,
+            channel_id = ?channel,
+            variable_name,
+            reject_reason = "feature is unsupported",
+            "environment variable request denied",
+        );
+        session.channel_failure(channel)?;
+
+        Ok(())
+    }
+
+    async fn exec_request(
+        &mut self,
+        channel: ChannelId,
+        data: &[u8],
+        session: &mut russh::server::Session,
+    ) -> Result<(), Self::Error> {
+        info!(
+            connection_id = self.connection_id,
+            peer_address = ?self.peer_addr,
+            channel_id = ?channel,
+            data_len = data.len(),
+            reject_reason = "feature is unsupported",
+            "command execution request denied",
+        );
+        session.channel_failure(channel)?;
+
+        Ok(())
+    }
+
+    async fn pty_request(
+        &mut self,
+        channel: ChannelId,
+        term: &str,
+        col_width: u32,
+        row_height: u32,
+        pix_width: u32,
+        pix_height: u32,
+        modes: &[(russh::Pty, u32)],
+        session: &mut russh::server::Session,
+    ) -> Result<(), Self::Error> {
+        info!(
+            connection_id = self.connection_id,
+            peer_address = ?self.peer_addr,
+            channel_id = ?channel,
+            term,
+            col_width,
+            row_height,
+            pix_width,
+            pix_height,
+            modes = ?modes,
+            reject_reason = "feature is unsupported",
+            "pty request denied",
+        );
+        session.channel_failure(channel)?;
+
+        Ok(())
+    }
+
+    async fn shell_request(
+        &mut self,
+        channel: ChannelId,
+        session: &mut russh::server::Session,
+    ) -> Result<(), Self::Error> {
+        info!(
+            connection_id = self.connection_id,
+            peer_address = ?self.peer_addr,
+            channel_id = ?channel,
+            reject_reason = "feature is unsupported",
+            "shell request denied",
+        );
+        session.channel_failure(channel)?;
+
+        Ok(())
+    }
+
+    async fn x11_request(
+        &mut self,
+        channel: ChannelId,
+        single_connection: bool,
+        x11_auth_protocol: &str,
+        x11_auth_cookie: &str,
+        x11_screen_number: u32,
+        session: &mut russh::server::Session,
+    ) -> Result<(), Self::Error> {
+        info!(
+            connection_id = self.connection_id,
+            peer_address = ?self.peer_addr,
+            channel_id = ?channel,
+            single_connection,
+            x11_auth_protocol,
+            x11_screen_number,
+            x11_auth_cookie,
+            reject_reason = "feature is unsupported",
+            "x11 connection request denied",
+        );
+        session.channel_failure(channel)?;
+
+        Ok(())
+    }
+
+    async fn tcpip_forward(
+        &mut self,
+        address: &str,
+        port: &mut u32,
+        session: &mut russh::server::Session,
+    ) -> Result<bool, Self::Error> {
+        info!(
+            connection_id = self.connection_id,
+            peer_address = ?self.peer_addr,
+            request_bind_address = address,
+            request_bind_port = port,
+            reject_reason = "feature is unsupported",
+            "agent request denied",
+        );
+
+        Ok(false)
     }
 }
