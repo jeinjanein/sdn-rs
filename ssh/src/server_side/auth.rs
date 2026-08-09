@@ -2,7 +2,7 @@ use argon2::{
     Argon2, PasswordHash, PasswordHasher, PasswordVerifier,
     password_hash::{SaltString, rand_core::OsRng},
 };
-use russh::keys::{PublicKey, ssh_key::authorized_keys};
+use russh::keys::PublicKey;
 
 use crate::server_side::{
     error::ServerError,

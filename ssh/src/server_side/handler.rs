@@ -236,7 +236,7 @@ impl russh::server::Handler for ConnectionHandler {
         &mut self,
         channel: russh::Channel<russh::server::Msg>,
         reply: russh::server::ChannelOpenHandle,
-        session: &mut russh::server::Session,
+        _session: &mut russh::server::Session,
     ) -> Result<(), Self::Error> {
         let channel_id = channel.id();
 
@@ -517,5 +517,36 @@ impl russh::server::Handler for ConnectionHandler {
         );
 
         Ok(false)
+    }
+
+    async fn data(
+        &mut self,
+        channel: ChannelId,
+        data: &[u8],
+        session: &mut russh::server::Session,
+    ) -> Result<(), Self::Error> {
+        let Some(mut channel_data) = self.channels.get_mut(&channel) else {
+            warn!(
+                connection_id = self.connection_id,
+                peer_address = ?self.peer_addr,
+                channel_id = ?channel,
+                "received data for unknown channel"
+            );
+
+            return Ok(());
+        };
+
+        channel_data.append_message_to_buffer(data);
+        
+        info!(
+            connection_id = self.connection_id,
+            peer_address = ?self.peer_addr,
+            channel_id = ?channel,
+            data_size = data.len(),
+            "data received for netconf channel"
+        );
+
+        
+        Ok(())
     }
 }
