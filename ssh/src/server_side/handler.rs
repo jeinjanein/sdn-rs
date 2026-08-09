@@ -1,4 +1,7 @@
-use russh::{ChannelId, ChannelOpenFailure, keys::ssh_key::authorized_keys, server::Auth};
+use russh::{
+    ChannelId, ChannelOpenFailure,
+    server::{Auth, ChannelOpenHandle},
+};
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tracing::{debug, info, warn};
 
@@ -99,6 +102,24 @@ impl ConnectionHandler {
     pub fn may_accept_another_session_channel(&self) -> bool {
         self.channel_count() < MAXIMUM_SESSION_CHANNELS_PER_CONNECTION
     }
+
+    pub async fn reject_unsupported_channel(
+        &self,
+        channel_id: ChannelId,
+        channel_type: &str,
+        reply: ChannelOpenHandle,
+    ) {
+        reply
+            .reject(ChannelOpenFailure::AdministrativelyProhibited)
+            .await;
+        warn!(
+            connection_id = self.connection_id,
+            peer_address = ?self.peer_addr,
+            ?channel_id,
+            channel_type,
+            "unsupported ssh channel type rejected",
+        );
+    }
 }
 
 impl russh::server::Handler for ConnectionHandler {
@@ -125,7 +146,7 @@ impl russh::server::Handler for ConnectionHandler {
                 return Ok(Auth::Accept);
             }
 
-            info!(
+            warn!(
                 connection_id = self.connection_id,
                 peer_address = ?self.peer_addr,
                 authentication_method = ?self.authentication_method,
@@ -136,7 +157,7 @@ impl russh::server::Handler for ConnectionHandler {
             return Ok(Auth::reject());
         }
 
-        info!(
+        warn!(
             connection_id = self.connection_id,
             peer_address = ?&self.peer_addr,
             username,
@@ -200,7 +221,7 @@ impl russh::server::Handler for ConnectionHandler {
             }
         }
 
-        info!(
+        warn!(
             connection_id = self.connection_id,
             peer_address = ?self.peer_addr,
             username,
@@ -252,6 +273,69 @@ impl russh::server::Handler for ConnectionHandler {
         Ok(())
     }
 
+    async fn channel_open_x11(
+        &mut self,
+        channel: russh::Channel<russh::server::Msg>,
+        _originator_address: &str,
+        _originator_port: u32,
+        reply: russh::server::ChannelOpenHandle,
+        session: &mut russh::server::Session,
+    ) -> Result<(), Self::Error> {
+        let channel_id = channel.id();
+        self.reject_unsupported_channel(channel_id, "x11", reply)
+            .await;
+        session.channel_failure(channel_id)?;
+        Ok(())
+    }
+
+    async fn channel_open_direct_tcpip(
+        &mut self,
+        channel: russh::Channel<russh::server::Msg>,
+        _host_to_connect: &str,
+        _port_to_connect: u32,
+        _originator_address: &str,
+        _originator_port: u32,
+        reply: ChannelOpenHandle,
+        session: &mut russh::server::Session,
+    ) -> Result<(), Self::Error> {
+        let channel_id = channel.id();
+        self.reject_unsupported_channel(channel_id, "direct-tcpip", reply)
+            .await;
+        session.channel_failure(channel_id)?;
+        Ok(())
+    }
+
+    async fn channel_open_direct_streamlocal(
+        &mut self,
+        channel: russh::Channel<russh::server::Msg>,
+        _socket_path: &str,
+        reply: ChannelOpenHandle,
+        session: &mut russh::server::Session,
+    ) -> Result<(), Self::Error> {
+        let channel_id = channel.id();
+        self.reject_unsupported_channel(channel_id, "direct-streamlocal", reply)
+            .await;
+        session.channel_failure(channel_id)?;
+        Ok(())
+    }
+
+    async fn channel_open_forwarded_tcpip(
+        &mut self,
+        channel: russh::Channel<russh::server::Msg>,
+        _host_to_connect: &str,
+        _port_to_connect: u32,
+        _originator_address: &str,
+        _originator_port: u32,
+        reply: ChannelOpenHandle,
+        session: &mut russh::server::Session,
+    ) -> Result<(), Self::Error> {
+        let channel_id = channel.id();
+        self.reject_unsupported_channel(channel_id, "forwarded-tcpip", reply)
+            .await;
+        session.channel_failure(channel_id)?;
+        Ok(())
+    }
+
     async fn subsystem_request(
         &mut self,
         channel: ChannelId,
@@ -269,7 +353,7 @@ impl russh::server::Handler for ConnectionHandler {
                 self.record_authorized_to_access_subsystem(Subsystem::Netconf);
                 session.channel_success(channel)?;
             } else {
-                info!(
+                warn!(
                     connection_id = self.connection_id,
                     peer_address = ?self.peer_addr,
                     channel_id = ?channel,
@@ -278,7 +362,7 @@ impl russh::server::Handler for ConnectionHandler {
                 session.channel_failure(channel)?;
             }
         } else {
-            info!(
+            warn!(
                 connection_id = self.connection_id,
                 peer_address = ?self.peer_addr,
                 channel_id = ?channel,
@@ -295,7 +379,7 @@ impl russh::server::Handler for ConnectionHandler {
         channel: ChannelId,
         session: &mut russh::server::Session,
     ) -> Result<bool, Self::Error> {
-        info!(
+        warn!(
             connection_id = self.connection_id,
             peer_address = ?self.peer_addr,
             channel_id = ?channel,
@@ -314,7 +398,7 @@ impl russh::server::Handler for ConnectionHandler {
         _variable_value: &str,
         session: &mut russh::server::Session,
     ) -> Result<(), Self::Error> {
-        info!(
+        warn!(
             connection_id = self.connection_id,
             peer_address = ?self.peer_addr,
             channel_id = ?channel,
@@ -333,7 +417,7 @@ impl russh::server::Handler for ConnectionHandler {
         data: &[u8],
         session: &mut russh::server::Session,
     ) -> Result<(), Self::Error> {
-        info!(
+        warn!(
             connection_id = self.connection_id,
             peer_address = ?self.peer_addr,
             channel_id = ?channel,
@@ -357,7 +441,7 @@ impl russh::server::Handler for ConnectionHandler {
         modes: &[(russh::Pty, u32)],
         session: &mut russh::server::Session,
     ) -> Result<(), Self::Error> {
-        info!(
+        warn!(
             connection_id = self.connection_id,
             peer_address = ?self.peer_addr,
             channel_id = ?channel,
@@ -380,7 +464,7 @@ impl russh::server::Handler for ConnectionHandler {
         channel: ChannelId,
         session: &mut russh::server::Session,
     ) -> Result<(), Self::Error> {
-        info!(
+        warn!(
             connection_id = self.connection_id,
             peer_address = ?self.peer_addr,
             channel_id = ?channel,
@@ -401,7 +485,7 @@ impl russh::server::Handler for ConnectionHandler {
         x11_screen_number: u32,
         session: &mut russh::server::Session,
     ) -> Result<(), Self::Error> {
-        info!(
+        warn!(
             connection_id = self.connection_id,
             peer_address = ?self.peer_addr,
             channel_id = ?channel,
@@ -421,9 +505,9 @@ impl russh::server::Handler for ConnectionHandler {
         &mut self,
         address: &str,
         port: &mut u32,
-        session: &mut russh::server::Session,
+        _session: &mut russh::server::Session,
     ) -> Result<bool, Self::Error> {
-        info!(
+        warn!(
             connection_id = self.connection_id,
             peer_address = ?self.peer_addr,
             request_bind_address = address,
