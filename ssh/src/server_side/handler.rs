@@ -523,9 +523,9 @@ impl russh::server::Handler for ConnectionHandler {
         &mut self,
         channel: ChannelId,
         data: &[u8],
-        session: &mut russh::server::Session,
+        _session: &mut russh::server::Session,
     ) -> Result<(), Self::Error> {
-        let Some(mut channel_data) = self.channels.get_mut(&channel) else {
+        let Some(channel_data) = self.channels.get_mut(&channel) else {
             warn!(
                 connection_id = self.connection_id,
                 peer_address = ?self.peer_addr,
@@ -536,8 +536,19 @@ impl russh::server::Handler for ConnectionHandler {
             return Ok(());
         };
 
+        if !channel_data.netconf_subsystem_is_activated() {
+            warn!(
+                connection_id = self.connection_id,
+                peer_address = ?self.peer_addr,
+                channel_id = ?channel,
+                "received data before netconf subsystem is activated"
+            );
+
+            return Ok(());
+        };
+
         channel_data.append_message_to_buffer(data);
-        
+
         info!(
             connection_id = self.connection_id,
             peer_address = ?self.peer_addr,
@@ -546,7 +557,67 @@ impl russh::server::Handler for ConnectionHandler {
             "data received for netconf channel"
         );
 
-        
+        // implement xml message validation later
+
+        Ok(())
+    }
+
+    async fn channel_eof(
+        &mut self,
+        channel: ChannelId,
+        _session: &mut russh::server::Session,
+    ) -> Result<(), Self::Error> {
+        let Some(channel_data) = self.channels.get_mut(&channel) else {
+            warn!(
+                connection_id = self.connection_id,
+                peer_address = ?self.peer_addr,
+                channel_id = ?channel,
+                "received EOF for unknown channel"
+            );
+
+            return Ok(());
+        };
+
+        channel_data.record_client_has_sent_eof();
+
+        debug!(
+            connection_id = self.connection_id,
+            peer_address = ?self.peer_addr,
+            channel_id = ?channel,
+            "received EOF"
+        );
+
+        Ok(())
+    }
+
+    async fn channel_close(
+        &mut self,
+        channel: ChannelId,
+        _session: &mut russh::server::Session,
+    ) -> Result<(), Self::Error> {
+        let Some(mut channel_data) = self.channels.remove(&channel) else {
+            warn!(
+                connection_id = self.connection_id,
+                peer_address = ?self.peer_addr,
+                channel_id = ?channel,
+                "received close for unknown channel"
+            );
+
+            return Ok(());
+        };
+
+        let server_initiated_close = channel_data.server_has_requested_close();
+
+        channel_data.record_client_has_sent_close();
+
+        debug!(
+            connection_id = self.connection_id,
+            peer_address = ?self.peer_addr,
+            channel_id = ?channel,
+            server_initiated_close,
+            "close received, channel data removed"
+        );
+
         Ok(())
     }
 }

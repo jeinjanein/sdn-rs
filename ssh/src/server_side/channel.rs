@@ -1,6 +1,6 @@
 use bytes::{Bytes, BytesMut};
 
-use crate::server_side::error::ServerError;
+use crate::server_side::{error::ServerError, subsystem::Subsystem};
 
 pub const MAXIMUM_SESSION_CHANNELS_PER_CONNECTION: usize = 4;
 
@@ -13,13 +13,21 @@ pub const NETCONF_MAXIMUM_INCOMPLETE_MESSAGE_LENGTH: usize =
 
 #[derive(Debug)]
 pub struct ChannelData {
+    activated_subsystem: Option<Subsystem>,
     received_buffer: BytesMut,
+    client_has_sent_eof: bool,
+    client_has_sent_close: bool,
+    server_has_requested_close: bool,
 }
 
 impl ChannelData {
     pub fn new() -> Self {
         Self {
+            activated_subsystem: None,
             received_buffer: BytesMut::new(),
+            client_has_sent_eof: false,
+            client_has_sent_close: false,
+            server_has_requested_close: false,
         }
     }
 
@@ -89,6 +97,42 @@ impl ChannelData {
         }
 
         Ok(messages)
+    }
+
+    pub fn activated_subsystem(&self) -> Option<Subsystem> {
+        self.activated_subsystem
+    }
+
+    pub fn record_activated_subsystem(&mut self, subsystem: Subsystem) {
+        self.activated_subsystem = Some(subsystem)
+    }
+
+    pub fn netconf_subsystem_is_activated(&self) -> bool {
+        self.activated_subsystem == Some(Subsystem::Netconf)
+    }
+
+    pub fn client_has_sent_eof(&self) -> bool {
+        self.client_has_sent_eof
+    }
+
+    pub fn record_client_has_sent_eof(&mut self) {
+        self.client_has_sent_eof = true
+    }
+
+    pub fn client_has_sent_close(&self) -> bool {
+        self.client_has_sent_close
+    }
+
+    pub fn record_client_has_sent_close(&mut self) {
+        self.client_has_sent_close = true
+    }
+
+    pub fn server_has_requested_close(&self) -> bool {
+        self.server_has_requested_close
+    }
+
+    pub fn record_server_has_requested_close(&mut self) {
+        self.server_has_requested_close = true
     }
 }
 
