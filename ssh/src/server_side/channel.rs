@@ -103,7 +103,16 @@ impl ChannelData {
         self.activated_subsystem
     }
 
+    pub fn may_activate_subsystem(&self) -> bool {
+        self.activated_subsystem.is_none()
+    }
+
     pub fn record_activated_subsystem(&mut self, subsystem: Subsystem) {
+        debug_assert!(
+            self.may_activate_subsystem(),
+            "channel already had active subsystem"
+        );
+
         self.activated_subsystem = Some(subsystem)
     }
 

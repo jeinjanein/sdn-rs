@@ -15,6 +15,8 @@ use crate::server_side::{
     subsystem::Subsystem,
 };
 
+const NETCONF_SUBSYSTEM_NAME:& str = "netconf";
+
 #[derive(Debug)]
 pub struct ConnectionHandler {
     connection_id: u64,
@@ -22,7 +24,6 @@ pub struct ConnectionHandler {
     authenticated_username: Option<String>,
     permissions: Option<Permissions>,
     authentication_method: Option<AuthenticationMethods>,
-    access_subsystem: Option<Subsystem>,
     server_resources: Arc<ServerResources>,
     channels: HashMap<ChannelId, ChannelData>,
 }
@@ -40,7 +41,6 @@ impl ConnectionHandler {
             authentication_method: None,
             permissions: None,
             server_resources,
-            access_subsystem: None,
             channels: HashMap::new(),
         }
     }
@@ -63,10 +63,6 @@ impl ConnectionHandler {
 
     pub fn authentication_method(&self) -> Option<AuthenticationMethods> {
         self.authentication_method
-    }
-
-    pub fn access_subsystem(&self) -> Option<Subsystem> {
-        self.access_subsystem
     }
 
     pub fn server_resources(&self) -> Arc<ServerResources> {
@@ -93,10 +89,6 @@ impl ConnectionHandler {
 
     pub fn is_authorized_to_access_subsystem(&self) -> bool {
         self.permissions.is_some()
-    }
-
-    pub fn record_authorized_to_access_subsystem(&mut self, subsystem: Subsystem) {
-        self.access_subsystem = Some(subsystem);
     }
 
     pub fn may_accept_another_session_channel(&self) -> bool {
@@ -279,12 +271,12 @@ impl russh::server::Handler for ConnectionHandler {
         _originator_address: &str,
         _originator_port: u32,
         reply: russh::server::ChannelOpenHandle,
-        session: &mut russh::server::Session,
+        _session: &mut russh::server::Session,
     ) -> Result<(), Self::Error> {
         let channel_id = channel.id();
         self.reject_unsupported_channel(channel_id, "x11", reply)
             .await;
-        session.channel_failure(channel_id)?;
+
         Ok(())
     }
 
@@ -296,12 +288,12 @@ impl russh::server::Handler for ConnectionHandler {
         _originator_address: &str,
         _originator_port: u32,
         reply: ChannelOpenHandle,
-        session: &mut russh::server::Session,
+        _session: &mut russh::server::Session,
     ) -> Result<(), Self::Error> {
         let channel_id = channel.id();
         self.reject_unsupported_channel(channel_id, "direct-tcpip", reply)
             .await;
-        session.channel_failure(channel_id)?;
+
         Ok(())
     }
 
@@ -310,12 +302,12 @@ impl russh::server::Handler for ConnectionHandler {
         channel: russh::Channel<russh::server::Msg>,
         _socket_path: &str,
         reply: ChannelOpenHandle,
-        session: &mut russh::server::Session,
+        _session: &mut russh::server::Session,
     ) -> Result<(), Self::Error> {
         let channel_id = channel.id();
         self.reject_unsupported_channel(channel_id, "direct-streamlocal", reply)
             .await;
-        session.channel_failure(channel_id)?;
+
         Ok(())
     }
 
@@ -327,49 +319,80 @@ impl russh::server::Handler for ConnectionHandler {
         _originator_address: &str,
         _originator_port: u32,
         reply: ChannelOpenHandle,
-        session: &mut russh::server::Session,
+        _session: &mut russh::server::Session,
     ) -> Result<(), Self::Error> {
         let channel_id = channel.id();
         self.reject_unsupported_channel(channel_id, "forwarded-tcpip", reply)
             .await;
-        session.channel_failure(channel_id)?;
+
         Ok(())
     }
 
-    async fn subsystem_request(
+        async fn subsystem_request(
         &mut self,
         channel: ChannelId,
         name: &str,
         session: &mut russh::server::Session,
     ) -> Result<(), Self::Error> {
-        if self.is_authorized_to_access_subsystem() {
-            if name == "netconf" {
-                info!(
-                    connection_id = self.connection_id,
-                    peer_address = ?self.peer_addr,
-                    channel_id = ?channel,
-                    "netconf subsystem authorized"
-                );
-                self.record_authorized_to_access_subsystem(Subsystem::Netconf);
-                session.channel_success(channel)?;
-            } else {
-                warn!(
-                    connection_id = self.connection_id,
-                    peer_address = ?self.peer_addr,
-                    channel_id = ?channel,
-                    "unknown subsystem rejected"
-                );
-                session.channel_failure(channel)?;
-            }
-        } else {
+        if name != NETCONF_SUBSYSTEM_NAME {
             warn!(
                 connection_id = self.connection_id,
                 peer_address = ?self.peer_addr,
                 channel_id = ?channel,
-                "access to subsystem denied"
+                subsystem_name = name,
+                "unknown subsystem rejected"
             );
             session.channel_failure(channel)?;
+
+            return Ok(());
         }
+
+        if !self.is_authorized_to_access_subsystem() {
+            warn!(
+                connection_id = self.connection_id,
+                peer_address = ?self.peer_addr,
+                channel_id = ?channel,
+                "access to netconf subsystem denied"
+            );
+            session.channel_failure(channel)?;
+
+            return Ok(());
+        }
+
+        let Some(channel_data) = self.channels.get_mut(&channel) else {
+            warn!(
+                connection_id = self.connection_id,
+                peer_address = ?self.peer_addr,
+                channel_id = ?channel,
+                "subsystem request for unknown channel"
+            );
+            session.channel_failure(channel)?;
+
+            return Ok(());
+        };
+
+        if !channel_data.may_activate_subsystem() {
+            warn!(
+                connection_id = self.connection_id,
+                peer_address = ?self.peer_addr,
+                channel_id = ?channel,
+                activated_subsystem = ?channel_data.activated_subsystem(),
+                "second subsystem request rejected"
+            );
+            session.channel_failure(channel)?;
+
+            return Ok(());
+        }
+
+        channel_data.record_activated_subsystem(Subsystem::Netconf);
+        session.channel_success(channel)?;
+
+        info!(
+            connection_id = self.connection_id,
+            peer_address = ?self.peer_addr,
+            channel_id = ?channel,
+            "netconf subsystem activated"
+        );
 
         Ok(())
     }
@@ -481,7 +504,7 @@ impl russh::server::Handler for ConnectionHandler {
         channel: ChannelId,
         single_connection: bool,
         x11_auth_protocol: &str,
-        x11_auth_cookie: &str,
+        _x11_auth_cookie: &str,
         x11_screen_number: u32,
         session: &mut russh::server::Session,
     ) -> Result<(), Self::Error> {
@@ -492,7 +515,6 @@ impl russh::server::Handler for ConnectionHandler {
             single_connection,
             x11_auth_protocol,
             x11_screen_number,
-            x11_auth_cookie,
             reject_reason = "feature is unsupported",
             "x11 connection request denied",
         );
@@ -513,7 +535,7 @@ impl russh::server::Handler for ConnectionHandler {
             request_bind_address = address,
             request_bind_port = port,
             reject_reason = "feature is unsupported",
-            "agent request denied",
+            "tcpip-forward request denied",
         );
 
         Ok(false)
