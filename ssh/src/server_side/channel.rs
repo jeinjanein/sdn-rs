@@ -218,4 +218,28 @@ mod tests {
             if message_size == invalid_size && maximum_size == NETCONF_MAXIMUM_INCOMPLETE_MESSAGE_LENGTH
         ));
     }
+
+    #[test]
+    fn netconf_framing_marker_may_be_split_across_receive_calls() {
+        let mut channel_data = ChannelData::new();
+
+        let first_message_raw = channel_data.append_message_to_buffer(b"<rpc></rpc>]]>");
+
+        let first_message_decoded = channel_data
+            .extract_messages_from_buffer()
+            .expect("should be empty");
+
+        assert!(first_message_decoded.is_empty());
+
+        let second_message_raw = channel_data.append_message_to_buffer(b"]]>");
+        let second_message_decoded = channel_data
+            .extract_messages_from_buffer()
+            .expect("should contain one messsage");
+
+        assert_eq!(second_message_decoded.len(), 1);
+
+        assert_eq!(second_message_decoded[0].as_ref(), b"<rpc></rpc>");
+
+        assert_eq!(channel_data.received_buffer_bytes_count(), 0);
+    }
 }
