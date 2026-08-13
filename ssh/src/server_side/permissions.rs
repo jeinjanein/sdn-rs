@@ -26,3 +26,41 @@ impl Permissions {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::server_side::permissions::Permissions;
+
+    #[test]
+    fn read_only_can_only_read_but_cannot_write_or_administer() {
+        let permissions = Permissions::ReadOnly;
+
+        assert!(permissions.is_authorized_to_read());
+
+        assert!(!permissions.is_authorized_to_write());
+
+        assert!(!permissions.is_authorized_to_administer());
+    }
+
+    #[test]
+    fn read_write_can_read_and_write_but_cannot_administer() {
+        let permissions = Permissions::ReadWrite;
+
+        assert!(permissions.is_authorized_to_read());
+
+        assert!(permissions.is_authorized_to_write());
+
+        assert!(!permissions.is_authorized_to_administer());
+    }
+
+    #[test]
+    fn administrator_can_read_write_and_administer() {
+        let permissions = Permissions::Administrator;
+
+        assert!(permissions.is_authorized_to_read());
+
+        assert!(permissions.is_authorized_to_write());
+
+        assert!(permissions.is_authorized_to_administer());
+    }
+}
