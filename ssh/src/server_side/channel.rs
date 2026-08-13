@@ -242,4 +242,43 @@ mod tests {
 
         assert_eq!(channel_data.received_buffer_bytes_count(), 0);
     }
+
+    #[test]
+    fn several_complete_messages_are_extracted_in_order() {
+        let mut channel_data = ChannelData::new();
+
+        let messages_raw =
+            channel_data.append_message_to_buffer(b"first]]>]]>second]]>]]>third]]>]]>");
+
+        let messages_decoded = channel_data
+            .extract_messages_from_buffer()
+            .expect("several complete messages are accepted");
+
+        assert_eq!(messages_decoded.len(), 3);
+
+        assert_eq!(messages_decoded[0].as_ref(), b"first");
+
+        assert_eq!(messages_decoded[1].as_ref(), b"second");
+
+        assert_eq!(messages_decoded[2].as_ref(), b"third");
+
+        assert_eq!(channel_data.received_buffer_bytes_count(), 0);
+    }
+
+    #[test]
+    fn complete_messages_are_extracted_while_incomplete_is_preserved() {
+        let mut channel_data = ChannelData::new();
+
+        let messages_raw = channel_data.append_message_to_buffer(b"first]]>]]>second]]>]]>thi");
+
+        let messages_decoded = channel_data.extract_messages_from_buffer().expect("complete messages are extracted");
+
+        assert_eq!(messages_decoded.len(), 2);
+
+        assert_eq!(messages_decoded[0].as_ref(), b"first");
+
+        assert_eq!(messages_decoded[1].as_ref(), b"second");
+
+        assert_eq!(channel_data.received_buffer_bytes_count(), 3);
+    }
 }
