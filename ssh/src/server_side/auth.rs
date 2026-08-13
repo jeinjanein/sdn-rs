@@ -42,7 +42,28 @@ pub fn check_admin_public_key(authorized_keys: &[PublicKey], key_to_check: &Publ
 
 #[cfg(test)]
 mod tests {
-    use crate::server_side::auth::admin_password_authentication;
+    use russh::keys::PublicKey;
+
+    use crate::server_side::{
+        auth::{admin_password_authentication, check_admin_public_key, verify_password_hash},
+        error::ServerError,
+    };
+
+    const DUMMY_ADMIN_PUBLIC_KEY: &str = concat!(
+        "ssh-ed25519 ",
+        "AAAAC3NzaC1lZDI1NTE5AAAAIJwutwmIIUraD6U+R31Ah6CBPiZijfoghZvET0dxOCT0 ",
+        "dummy admin host key"
+    );
+
+    const UNAUTHORIZED_USER_KEY: &str = concat!(
+        "ssh-ed25519 ",
+        "AAAAC3NzaC1lZDI1NTE5AAAAIMlq7t9N7HBDMjRViAr6Z2CWUq91l1WUI+i644RC5Wi5 ",
+        "random key to test"
+    );
+
+    fn parse_public_key(public_key: &str) -> PublicKey {
+        PublicKey::from_openssh(public_key).expect("test public key should be valid")
+    }
 
     #[test]
     fn validate_admin() {
@@ -65,5 +86,21 @@ mod tests {
         let username = "admin";
         let password = "asdasdasd";
         assert!(!admin_password_authentication(username, password));
+    }
+
+    #[test]
+    fn malformed_password_has_returns_password_hash_error() {
+        let result = verify_password_hash("admin", "not-argon2-hash");
+
+        assert!(matches!(result, Err(ServerError::PasswordHash { .. })));
+    }
+
+    #[test]
+    fn different_public_key_is_rejected() {
+        let dummy_admin_key = parse_public_key(DUMMY_ADMIN_PUBLIC_KEY);
+
+        let other_key = parse_public_key(UNAUTHORIZED_USER_KEY);
+
+        assert!(!check_admin_public_key(&[dummy_admin_key], &other_key));
     }
 }

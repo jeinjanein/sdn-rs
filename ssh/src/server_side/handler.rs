@@ -15,7 +15,7 @@ use crate::server_side::{
     subsystem::Subsystem,
 };
 
-const NETCONF_SUBSYSTEM_NAME:& str = "netconf";
+const NETCONF_SUBSYSTEM_NAME: &str = "netconf";
 
 #[derive(Debug)]
 pub struct ConnectionHandler {
@@ -328,7 +328,7 @@ impl russh::server::Handler for ConnectionHandler {
         Ok(())
     }
 
-        async fn subsystem_request(
+    async fn subsystem_request(
         &mut self,
         channel: ChannelId,
         name: &str,

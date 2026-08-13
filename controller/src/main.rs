@@ -10,11 +10,11 @@ use tracing::info;
 
 mod logging;
 
-const HOST_PRIVATE_KEY_PATH: &str = "./keys/admin_ed25519_key";
+const HOST_PRIVATE_KEY_PATH: &str = "./keys/host_ed25519_key";
 
 const HOST_ADDRESS: &str = "127.0.0.1:2222";
 
-const HOST_PUBLIC_KEY_PATH: &str = "./keys/admin_ed25519_key.pub";
+const ADMIN_PUBLIC_KEY_PATH: &str = "./keys/admin_ed25519_key.pub";
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -25,7 +25,7 @@ async fn main() -> anyhow::Result<()> {
     let bind_address = TcpListener::bind(HOST_ADDRESS).await?;
     info!("SSH server is listening");
 
-    let admin_public_key = load_public_key(HOST_PUBLIC_KEY_PATH)?;
+    let admin_public_key = load_public_key(ADMIN_PUBLIC_KEY_PATH)?;
 
     let mut ssh_server = SshServer::new(vec![admin_public_key]);
 
