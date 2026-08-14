@@ -223,7 +223,7 @@ mod tests {
     fn netconf_framing_marker_may_be_split_across_receive_calls() {
         let mut channel_data = ChannelData::new();
 
-        let first_message_raw = channel_data.append_message_to_buffer(b"<rpc></rpc>]]>");
+        channel_data.append_message_to_buffer(b"<rpc></rpc>]]>");
 
         let first_message_decoded = channel_data
             .extract_messages_from_buffer()
@@ -231,7 +231,7 @@ mod tests {
 
         assert!(first_message_decoded.is_empty());
 
-        let second_message_raw = channel_data.append_message_to_buffer(b"]]>");
+        channel_data.append_message_to_buffer(b"]]>");
         let second_message_decoded = channel_data
             .extract_messages_from_buffer()
             .expect("should contain one messsage");
@@ -247,8 +247,7 @@ mod tests {
     fn several_complete_messages_are_extracted_in_order() {
         let mut channel_data = ChannelData::new();
 
-        let messages_raw =
-            channel_data.append_message_to_buffer(b"first]]>]]>second]]>]]>third]]>]]>");
+        channel_data.append_message_to_buffer(b"first]]>]]>second]]>]]>third]]>]]>");
 
         let messages_decoded = channel_data
             .extract_messages_from_buffer()
@@ -269,9 +268,11 @@ mod tests {
     fn complete_messages_are_extracted_while_incomplete_is_preserved() {
         let mut channel_data = ChannelData::new();
 
-        let messages_raw = channel_data.append_message_to_buffer(b"first]]>]]>second]]>]]>thi");
+        channel_data.append_message_to_buffer(b"first]]>]]>second]]>]]>thi");
 
-        let messages_decoded = channel_data.extract_messages_from_buffer().expect("complete messages are extracted");
+        let messages_decoded = channel_data
+            .extract_messages_from_buffer()
+            .expect("complete messages are extracted");
 
         assert_eq!(messages_decoded.len(), 2);
 
