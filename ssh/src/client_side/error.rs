@@ -7,4 +7,10 @@ pub enum ClientError {
         #[from]
         source: russh::Error,
     },
+
+    #[error("SSH keys error: {source}")]
+    Key {
+        #[from]
+        source: russh::keys::Error,
+    },
 }

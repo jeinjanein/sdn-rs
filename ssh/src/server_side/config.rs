@@ -85,13 +85,7 @@ const ALLOWED_MESSAGE_AUTHENTICATION_ALGORITHMS: &[mac::Name] = &[
 ];
 
 // default compression algorithms of russh
-const ALLOWED_COMPRESSION_ALGORITHMS: &[compression::Name] = &[
-    compression::NONE,
-    #[cfg(feature = "flate2")]
-    compression::ZLIB,
-    #[cfg(feature = "flate2")]
-    compression::ZLIB_LEGACY,
-];
+const ALLOWED_COMPRESSION_ALGORITHMS: &[compression::Name] = &[compression::NONE];
 
 const MAX_AUTHENTICATION_ATTEMPS: usize = 3;
 
@@ -120,7 +114,9 @@ fn allowed_ssh_algorithms() -> Preferred {
     }
 }
 
-pub fn create_server_config(private_key_path: impl AsRef<Path>) -> Result<Config, ServerError> {
+pub fn create_server_config(
+    private_key_path: impl AsRef<Path>,
+) -> Result<Config, ServerError> {
     let private_key = load_private_key(private_key_path)?;
 
     Ok(Config {
