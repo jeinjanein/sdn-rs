@@ -321,14 +321,6 @@ checksum = "a6ef517f0926dd24a1582492c791b6a4818a4d94e789a334894aa15b0d12f55c"
 [[package]]
 name = "controller"
 version = "0.1.0"
-dependencies = [
- "anyhow",
- "russh",
- "ssh",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
 
 [[package]]
 name = "core-foundation-sys"
@@ -1729,6 +1721,14 @@ checksum = "3a219298ac11a56ea9a6d2120044824d6f01aeb034955e7af7bc16858527deea"
 [[package]]
 name = "simulator"
 version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "russh",
+ "ssh",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
 
 [[package]]
 name = "slab"

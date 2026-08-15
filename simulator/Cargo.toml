@@ -17,3 +17,9 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
+ssh = { path = "../ssh"}
+tokio.workspace = true
+anyhow.workspace = true
+russh.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true

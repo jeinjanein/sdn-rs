@@ -114,9 +114,7 @@ fn allowed_ssh_algorithms() -> Preferred {
     }
 }
 
-pub fn create_server_config(
-    private_key_path: impl AsRef<Path>,
-) -> Result<Config, ServerError> {
+pub fn create_server_config(private_key_path: impl AsRef<Path>) -> Result<Config, ServerError> {
     let private_key = load_private_key(private_key_path)?;
 
     Ok(Config {
