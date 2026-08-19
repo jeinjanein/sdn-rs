@@ -11,7 +11,7 @@ pub struct SshClient {
 }
 
 impl SshClient {
-    pub(crate) fn from_handle(
+    pub fn from_handle(
         handle: Handle<ConnectionHandler>,
         connection_id: u64,
         remote_endpoint: Option<SocketAddr>,
@@ -23,7 +23,7 @@ impl SshClient {
         }
     }
 
-    pub(crate) fn handle_mut(&mut self) -> &mut Handle<ConnectionHandler> {
+    pub fn handle_mut(&mut self) -> &mut Handle<ConnectionHandler> {
         &mut self.handle
     }
 
