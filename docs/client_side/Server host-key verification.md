@@ -16,7 +16,7 @@ The SSH library can verify the signature made by the received host key, but it c
 ```rust
 fn check_server_key(
     &mut self,
-    server_public_key: &ssh_key::PublicKey,
+    server_public_key: &russh::keys::PublicKey,
 ) -> impl Future<Output = Result<bool, Self::Error>> + Send;
 ```
 - `Ok(true)` means the application recognizes the key and permits the SSH handshake to continue
@@ -33,3 +33,14 @@ async fn check_server_key(
 }
 ```
 The method rejects every key, so it is not yet useful for a production connection, but it does not create an unauthenticated path. 
+
+# 2. Rejecting unknown SSH server host keys by default
+## 2.1 Why rejection remain the default
+The handler does not yet have trusted host information. It cannot distinguish the intended device from another SSH server that presents a different key.
+
+Accepting a key because it is syntactically valid would disable server authentication. The safe decision is to reject the connection until later implementation supplies trusted data and proves that the received key mathces it
+
+## 2.2 Adding test
+```rust
+
+```
