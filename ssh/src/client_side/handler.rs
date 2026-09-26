@@ -45,6 +45,14 @@ impl russh::client::Handler for ConnectionHandler {
         Ok(())
     }
 
+    async fn check_server_key(
+        &mut self,
+        server_public_key: &ssh_key::PublicKey,
+    ) -> Result<bool, Self::Error>
+    {
+        Ok(false)
+    }
+
     async fn kex_done(
         &mut self,
         _shared_secret: Option<&[u8]>,
