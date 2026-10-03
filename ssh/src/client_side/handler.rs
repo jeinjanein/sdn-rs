@@ -1,6 +1,6 @@
 use std::net::SocketAddr;
 
-use russh::{client::DisconnectReason, keys::{PublicKey}};
+use russh::{client::DisconnectReason, keys::PublicKey};
 use tracing::{debug, info, warn};
 
 use crate::client_side::error::ClientError;
@@ -48,9 +48,8 @@ impl russh::client::Handler for ConnectionHandler {
     async fn check_server_key(
         &mut self,
         server_public_key: &PublicKey,
-    ) -> Result<bool, Self::Error>
-    {
-        Ok(false)   
+    ) -> Result<bool, Self::Error> {
+        Ok(false)
     }
 
     async fn kex_done(
@@ -208,12 +207,11 @@ impl russh::client::Handler for ConnectionHandler {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use russh::{client::Handler, keys::PublicKey};
 
-use crate::client_side::handler::ConnectionHandler;
+    use crate::client_side::handler::ConnectionHandler;
 
     const UNKNOWN_SERVER_PUBLIC_KEY: &str = concat!(
         "ssh-ed25519 ",
@@ -222,7 +220,8 @@ use crate::client_side::handler::ConnectionHandler;
     );
 
     fn parse_public_key(public_key: &str) -> PublicKey {
-        PublicKey::from_openssh(public_key).expect("test public key should be a OpenSSH-formatted public key")
+        PublicKey::from_openssh(public_key)
+            .expect("test public key should be a OpenSSH-formatted public key")
     }
 
     #[tokio::test]
@@ -230,10 +229,11 @@ use crate::client_side::handler::ConnectionHandler;
         let mut handler = ConnectionHandler::new(0, None);
         let server_public_key = parse_public_key(UNKNOWN_SERVER_PUBLIC_KEY);
 
-        let accepted = handler.check_server_key(&server_public_key)
-        .await
-        .expect("host-key policy should return a decision");
-        
+        let accepted = handler
+            .check_server_key(&server_public_key)
+            .await
+            .expect("host-key policy should return a decision");
+
         assert!(!accepted);
     }
 }
