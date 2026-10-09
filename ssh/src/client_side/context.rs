@@ -8,10 +8,17 @@ pub struct ConnectionContext {
     known_host_policy: HostKeyPolicy,
 }
 
-
 impl ConnectionContext {
-    pub fn new(connection_id: u64, target_host: TargetIdentity, known_host_policy: HostKeyPolicy) -> Self {
-        Self { connection_id, target_host, known_host_policy }
+    pub fn new(
+        connection_id: u64,
+        target_host: TargetIdentity,
+        known_host_policy: HostKeyPolicy,
+    ) -> Self {
+        Self {
+            connection_id,
+            target_host,
+            known_host_policy,
+        }
     }
 
     pub fn connection_id(&self) -> u64 {

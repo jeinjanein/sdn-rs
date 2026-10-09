@@ -1,25 +1,22 @@
-use std::net::SocketAddr;
-
-use russh::client::Handle;
-
+use crate::client_side::context::ConnectionContext;
 use crate::client_side::handler::ConnectionHandler;
+use russh::client::Handle;
+use std::sync::Arc;
 
+/// A wrapper around an established SSH connection
 pub struct SshClient {
     handle: Handle<ConnectionHandler>,
-    connection_id: u64,
-    remote_endpoint: Option<SocketAddr>,
+    connection_context: Arc<ConnectionContext>,
 }
 
 impl SshClient {
     pub fn from_handle(
         handle: Handle<ConnectionHandler>,
-        connection_id: u64,
-        remote_endpoint: Option<SocketAddr>,
+        connection_context: Arc<ConnectionContext>,
     ) -> Self {
         Self {
             handle,
-            connection_id,
-            remote_endpoint,
+            connection_context,
         }
     }
 
@@ -31,11 +28,7 @@ impl SshClient {
         self.handle.is_closed()
     }
 
-    pub fn connection_id(&self) -> u64 {
-        self.connection_id
-    }
-
-    pub fn remote_endpoint(&self) -> Option<SocketAddr> {
-        self.remote_endpoint
+    pub fn connection_context(&self) -> &ConnectionContext {
+        &self.connection_context
     }
 }
