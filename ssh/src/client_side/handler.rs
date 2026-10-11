@@ -1,5 +1,5 @@
-use crate::client_side::context::ConnectionContext;
 use crate::client_side::error::ClientError;
+use crate::client_side::{context::ConnectionContext, known_hosts::verify_server_key};
 use russh::{client::DisconnectReason, keys::PublicKey};
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -21,6 +21,10 @@ impl ConnectionHandler {
 
     pub fn peer_addr(&self) -> &Option<SocketAddr> {
         self.connection_context.target_host().peer_addr()
+    }
+
+    pub fn connection_context(&self) -> Arc<ConnectionContext> {
+        Arc::clone(&self.connection_context)
     }
 }
 
@@ -44,9 +48,11 @@ impl russh::client::Handler for ConnectionHandler {
 
     async fn check_server_key(
         &mut self,
-        _server_public_key: &PublicKey,
+        server_public_key: &PublicKey,
     ) -> Result<bool, Self::Error> {
-        Ok(false)
+        let result = verify_server_key(self.connection_context(), server_public_key)?;
+
+        Ok(result)
     }
 
     async fn kex_done(

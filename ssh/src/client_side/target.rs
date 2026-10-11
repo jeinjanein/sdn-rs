@@ -3,22 +3,22 @@ use std::net::SocketAddr;
 /// Represents the network identity of an SSH server target
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TargetIdentity {
-    hostname: String,
+    host_name: String,
     port: u16,
     peer_addr: Option<SocketAddr>,
 }
 
 impl TargetIdentity {
-    pub fn new(hostname: String, port: u16, peer_addr: Option<SocketAddr>) -> Self {
+    pub fn new(host_name: String, port: u16, peer_addr: Option<SocketAddr>) -> Self {
         Self {
-            hostname,
+            host_name,
             port,
             peer_addr,
         }
     }
 
-    pub fn hostname(&self) -> &str {
-        &self.hostname
+    pub fn host_name(&self) -> &str {
+        &self.host_name
     }
 
     pub fn port(&self) -> u16 {

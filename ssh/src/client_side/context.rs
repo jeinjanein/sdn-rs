@@ -5,19 +5,19 @@ use crate::client_side::{known_hosts::HostKeyPolicy, target::TargetIdentity};
 pub struct ConnectionContext {
     connection_id: u64,
     target_host: TargetIdentity,
-    known_host_policy: HostKeyPolicy,
+    host_key_policy: HostKeyPolicy,
 }
 
 impl ConnectionContext {
     pub fn new(
         connection_id: u64,
         target_host: TargetIdentity,
-        known_host_policy: HostKeyPolicy,
+        host_key_policy: HostKeyPolicy,
     ) -> Self {
         Self {
             connection_id,
             target_host,
-            known_host_policy,
+            host_key_policy,
         }
     }
 
@@ -29,7 +29,7 @@ impl ConnectionContext {
         &self.target_host
     }
 
-    pub fn known_host_policy(&self) -> &HostKeyPolicy {
-        &self.known_host_policy
+    pub fn host_key_policy(&self) -> &HostKeyPolicy {
+        &self.host_key_policy
     }
 }

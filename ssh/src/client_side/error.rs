@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -49,5 +51,13 @@ pub enum ClientError {
     TcpConnection {
         #[source]
         source: std::io::Error,
+    },
+
+    #[error("SSH host key changed for {host}:{port} at {path}:{line}")]
+    HostKeyChanged {
+        host: String,
+        port: u16,
+        path: PathBuf,
+        line: usize,
     },
 }
