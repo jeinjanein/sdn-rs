@@ -36,7 +36,7 @@ impl russh::client::Handler for ConnectionHandler {
         banner: &str,
         _session: &mut russh::client::Session,
     ) -> Result<(), Self::Error> {
-        info!(
+        debug!(
             connection_id = self.connection_id(),
             peer_addr = ?self.peer_addr(),
             banner = ?banner,
@@ -50,9 +50,53 @@ impl russh::client::Handler for ConnectionHandler {
         &mut self,
         server_public_key: &PublicKey,
     ) -> Result<bool, Self::Error> {
-        let result = verify_server_key(self.connection_context(), server_public_key)?;
+        let target_host = self.connection_context.target_host();
+        let host_name = target_host.host_name();
+        let port = target_host.port();
+        let key_algorithm = server_public_key.algorithm();
+        let server_key_fingerprint = server_public_key.fingerprint(Default::default());
 
-        Ok(result)
+        match verify_server_key(self.connection_context(), server_public_key) {
+            Ok(true) => {
+                info!(
+                    connection_id = self.connection_id(),
+                    host_name,
+                    port,
+                    peer_addr = ?self.peer_addr(),
+                    %key_algorithm,
+                    %server_key_fingerprint,
+                    "SSH server host key verified",
+                );
+                Ok(true)
+            }
+            Ok(false) => {
+                warn!(
+                    connection_id = self.connection_id(),
+                    host_name,
+                    port,
+                    peer_addr = ?self.peer_addr(),
+                    %key_algorithm,
+                    %server_key_fingerprint,
+                    "SSH server host key rejected",
+                );
+                Ok(false)
+            }
+
+            Err(error) => {
+                warn!(
+                    connection_id = self.connection_id(),
+                    host_name,
+                    port,
+                    peer_addr = ?self.peer_addr(),
+                    %key_algorithm,
+                    %server_key_fingerprint,
+                    error = %error,
+                    "SSH server host key verification failed",
+                );
+
+                Err(error)
+            }
+        }
     }
 
     async fn kex_done(
@@ -212,18 +256,98 @@ impl russh::client::Handler for ConnectionHandler {
 
 #[cfg(test)]
 mod tests {
+    use std::{path::PathBuf, sync::Arc};
+
     use russh::{client::Handler, keys::PublicKey};
 
-    use crate::client_side::handler::ConnectionHandler;
+    use crate::client_side::{
+        context::ConnectionContext, error::ClientError, handler::{self, ConnectionHandler}, known_hosts::HostKeyPolicy, target::TargetIdentity,
+    };
 
-    const UNKNOWN_SERVER_PUBLIC_KEY: &str = concat!(
+    const KNOWN_KEY: &str = concat!(
         "ssh-ed25519 ",
-        "AAAAC3NzaC1lZDI1NTE5AAAAIJwutwmIIUraD6U+R31Ah6CBPiZijfoghZvET0dxOCT0 ",
-        "unknown test server key"
+        "AAAAC3NzaC1lZDI1NTE5AAAAINU0dNEp2u7eCNMf1M3ZRejErz2QUqYh6EJs/+CFUrnf"
+    );
+    const OTHER_KEY: &str = concat!(
+        "ssh-ed25519 ",
+        "AAAAC3NzaC1lZDI1NTE5AAAAIJwutwmIIUraD6U+R31Ah6CBPiZijfoghZvET0dxOCT0"
     );
 
-    fn parse_public_key(public_key: &str) -> PublicKey {
-        PublicKey::from_openssh(public_key)
-            .expect("test public key should be a OpenSSH-formatted public key")
+    const KNOWN_HOSTS_PATH: &str =
+        concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/known_hosts");
+
+    fn handler(host: &str, host_key_policy: HostKeyPolicy) -> ConnectionHandler {
+        let connection_context = Arc::new(ConnectionContext::new(
+            1,
+            TargetIdentity::new(host.into(), 2222, Some("127.0.0.1:2222".parse().unwrap())),
+            host_key_policy,
+        ));
+
+        ConnectionHandler { connection_context }
+    }
+
+    #[tokio::test]
+    async fn check_server_key_policy_rejects_all_keys() {
+        let key = PublicKey::from_openssh(KNOWN_KEY).unwrap();
+        let host_key_policy = HostKeyPolicy::RejectAll;
+        let mut handler = handler("demo", host_key_policy);
+        assert!(!handler.check_server_key(&key).await.unwrap())
+    }
+
+    #[tokio::test]
+    async fn check_server_key_policy_known_host_matches() {
+        let key = PublicKey::from_openssh(KNOWN_KEY).unwrap();
+        let path = PathBuf::from(KNOWN_HOSTS_PATH);
+        let host_key_policy = HostKeyPolicy::KnownHost { path };
+        let mut handler = handler("router.example1.com", host_key_policy);
+
+        assert!(handler.check_server_key(&key).await.unwrap())
+    }
+
+    #[tokio::test]
+    async fn check_server_key_policy_known_host_key_changed() {
+        let other_key = PublicKey::from_openssh(OTHER_KEY).unwrap();
+        let path = PathBuf::from(KNOWN_HOSTS_PATH);
+        let host_key_policy = HostKeyPolicy::KnownHost { path };
+        let mut handler = handler("router.example1.com", host_key_policy);
+
+        assert!(matches!(
+            handler.check_server_key(&other_key).await,
+            Err(ClientError::HostKeyChanged { host, port, path, line }) if host == "router.example1.com"
+        ));
+    }
+
+    #[tokio::test]
+    async fn check_server_key_policy_pinned_key() {
+        let key = PublicKey::from_openssh(KNOWN_KEY).unwrap();
+        let other_key = PublicKey::from_openssh(OTHER_KEY).unwrap();
+        let host_key_policy = HostKeyPolicy::PinnedKey { key: key.clone() };
+        let mut handler = handler("Pinned Key", host_key_policy);
+
+        assert!(handler.check_server_key(&key).await.unwrap());
+        assert!(!handler.check_server_key(&other_key).await.unwrap())
+    }
+
+    #[tokio::test]
+    async fn check_server_key_policy_pinned_fingerprint() {
+        let key = PublicKey::from_openssh(KNOWN_KEY).unwrap();
+        let other_key = PublicKey::from_openssh(OTHER_KEY).unwrap();
+        let pinned_fingerprint = key.fingerprint(Default::default());
+        let host_key_policy = HostKeyPolicy::PinnedFingerprint {
+            fingerprint: pinned_fingerprint,
+        };
+        let mut handler = handler("Pinned Fingerprint", host_key_policy);
+
+        assert!(handler.check_server_key(&key).await.unwrap());
+        assert!(!handler.check_server_key(&other_key).await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn check_server_key_policy_accept_any() {
+        let key = PublicKey::from_openssh(KNOWN_KEY).unwrap();
+        let host_key_policy = HostKeyPolicy::AcceptAnyForTesting;
+        let mut handler = handler("Accept any", host_key_policy);
+
+        assert!(handler.check_server_key(&key).await.unwrap());
     }
 }
