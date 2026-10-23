@@ -261,7 +261,11 @@ mod tests {
     use russh::{client::Handler, keys::PublicKey};
 
     use crate::client_side::{
-        context::ConnectionContext, error::ClientError, handler::{self, ConnectionHandler}, known_hosts::HostKeyPolicy, target::TargetIdentity,
+        context::ConnectionContext,
+        error::ClientError,
+        handler::{self, ConnectionHandler},
+        known_hosts::HostKeyPolicy,
+        target::TargetIdentity,
     };
 
     const KNOWN_KEY: &str = concat!(
