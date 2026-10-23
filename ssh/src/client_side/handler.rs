@@ -1,6 +1,7 @@
 use crate::client_side::error::ClientError;
 use crate::client_side::{context::ConnectionContext, known_hosts::verify_server_key};
-use russh::{client::DisconnectReason, keys::PublicKey};
+use russh::client::{ChannelOpenHandle, Msg, Session};
+use russh::{Channel, ChannelId, ChannelOpenFailure, Sig, client::DisconnectReason, keys::PublicKey};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
@@ -34,7 +35,7 @@ impl russh::client::Handler for ConnectionHandler {
     async fn auth_banner(
         &mut self,
         banner: &str,
-        _session: &mut russh::client::Session,
+        _session: &mut Session,
     ) -> Result<(), Self::Error> {
         debug!(
             connection_id = self.connection_id(),
@@ -103,7 +104,7 @@ impl russh::client::Handler for ConnectionHandler {
         &mut self,
         _shared_secret: Option<&[u8]>,
         names: &russh::Names,
-        _session: &mut russh::client::Session,
+        _session: &mut Session,
     ) -> Result<(), Self::Error> {
         debug!(
             connection_id = self.connection_id(),
@@ -124,10 +125,10 @@ impl russh::client::Handler for ConnectionHandler {
 
     async fn channel_open_confirmation(
         &mut self,
-        id: russh::ChannelId,
+        id: ChannelId,
         max_packet_size: u32,
         window_size: u32,
-        _session: &mut russh::client::Session,
+        _session: &mut Session,
     ) -> Result<(), Self::Error> {
         debug!(
             connection_id = self.connection_id(),
@@ -143,8 +144,8 @@ impl russh::client::Handler for ConnectionHandler {
 
     async fn channel_success(
         &mut self,
-        channel: russh::ChannelId,
-        _session: &mut russh::client::Session,
+        channel: ChannelId,
+        _session: &mut Session,
     ) -> Result<(), Self::Error> {
         debug!(
             connection_id = self.connection_id(),
@@ -158,8 +159,8 @@ impl russh::client::Handler for ConnectionHandler {
 
     async fn channel_failure(
         &mut self,
-        channel: russh::ChannelId,
-        _session: &mut russh::client::Session,
+        channel: ChannelId,
+        _session: &mut Session,
     ) -> Result<(), Self::Error> {
         warn!(
             connection_id = self.connection_id(),
@@ -173,8 +174,8 @@ impl russh::client::Handler for ConnectionHandler {
 
     async fn channel_close(
         &mut self,
-        channel: russh::ChannelId,
-        _session: &mut russh::client::Session,
+        channel: ChannelId,
+        _session: &mut Session,
     ) -> Result<(), Self::Error> {
         debug!(
             connection_id = self.connection_id(),
@@ -188,8 +189,8 @@ impl russh::client::Handler for ConnectionHandler {
 
     async fn channel_eof(
         &mut self,
-        channel: russh::ChannelId,
-        _session: &mut russh::client::Session,
+        channel: ChannelId,
+        _session: &mut Session,
     ) -> Result<(), Self::Error> {
         debug!(
             connection_id = self.connection_id(),
@@ -203,11 +204,11 @@ impl russh::client::Handler for ConnectionHandler {
 
     async fn channel_open_failure(
         &mut self,
-        channel: russh::ChannelId,
-        reason: russh::ChannelOpenFailure,
+        channel: ChannelId,
+        reason: ChannelOpenFailure,
         description: &str,
         language: &str,
-        _session: &mut russh::client::Session,
+        _session: &mut Session,
     ) -> Result<(), Self::Error> {
         warn!(
             connection_id = self.connection_id(),
@@ -223,9 +224,195 @@ impl russh::client::Handler for ConnectionHandler {
         Ok(())
     }
 
+    async fn server_channel_open_forwarded_tcpip(
+        &mut self,
+        _channel: Channel<Msg>,
+        _connected_address: &str,
+        _connected_port: u32,
+        _originator_address: &str,
+        _originator_port: u32,
+        reply: ChannelOpenHandle,
+        _session: &mut Session,
+    ) -> Result<(), Self::Error>{
+        reply
+            .reject(ChannelOpenFailure::AdministrativelyProhibited)
+            .await;
+        Ok(())
+    }
+
+    async fn server_channel_open_forwarded_streamlocal(
+        &mut self,
+        _channel: Channel<Msg>,
+        _socket_path: &str,
+        reply: ChannelOpenHandle,
+        _session: &mut Session,
+    ) -> Result<(), Self::Error> {
+        reply
+            .reject(ChannelOpenFailure::AdministrativelyProhibited)
+            .await;
+        Ok(())
+    }
+
+    async fn server_channel_open_agent_forward(
+        &mut self,
+        _channel: Channel<Msg>,
+        reply: ChannelOpenHandle,
+        _session: &mut Session,
+    ) -> Result<(), Self::Error> {
+        reply
+            .reject(ChannelOpenFailure::AdministrativelyProhibited)
+            .await;
+        Ok(())
+    }
+
+    async fn should_accept_unknown_server_channel(
+        &mut self,
+        _id: ChannelId,
+        _channel_type: &str,
+    ) -> bool {
+        false
+    }
+
+    async fn server_channel_open_unknown(
+        &mut self,
+        _channel: Channel<Msg>,
+        reply: ChannelOpenHandle,
+        _session: &mut Session,
+    ) -> Result<(), Self::Error> {
+        reply
+            .reject(ChannelOpenFailure::AdministrativelyProhibited)
+            .await;
+        Ok(())
+    }
+
+    async fn server_channel_open_session(
+        &mut self,
+        _channel: Channel<Msg>,
+        reply: ChannelOpenHandle,
+        _session: &mut Session,
+    ) -> Result<(), Self::Error> {
+        reply
+            .reject(ChannelOpenFailure::AdministrativelyProhibited)
+            .await;
+        Ok(())
+    }
+
+    async fn server_channel_open_direct_tcpip(
+        &mut self,
+        _channel: Channel<Msg>,
+        _host_to_connect: &str,
+        _port_to_connect: u32,
+        _originator_address: &str,
+        _originator_port: u32,
+        reply: ChannelOpenHandle,
+        _session: &mut Session,
+    ) -> Result<(), Self::Error> {
+        reply
+            .reject(ChannelOpenFailure::AdministrativelyProhibited)
+            .await;
+        Ok(())
+    }
+
+    async fn server_channel_open_direct_streamlocal(
+        &mut self,
+        _channel: Channel<Msg>,
+        _socket_path: &str,
+        reply: ChannelOpenHandle,
+        _session: &mut Session,
+    ) -> Result<(), Self::Error> {
+        reply
+            .reject(ChannelOpenFailure::AdministrativelyProhibited)
+            .await;
+        Ok(())
+    }
+
+    async fn server_channel_open_x11(
+        &mut self,
+        _channel: Channel<Msg>,
+        _originator_address: &str,
+        _originator_port: u32,
+        reply: ChannelOpenHandle,
+        _session: &mut Session,
+    ) -> Result<(), Self::Error> {
+        reply
+            .reject(ChannelOpenFailure::AdministrativelyProhibited)
+            .await;
+        Ok(())
+    }
+
+    async fn data(
+        &mut self,
+        _channel: ChannelId,
+        _data: &[u8],
+        _session: &mut Session,
+    ) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
+    async fn extended_data(
+        &mut self,
+        _channel: ChannelId,
+        _ext: u32,
+        _data: &[u8],
+        _session: &mut Session,
+    ) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
+    async fn xon_xoff(
+        &mut self,
+        _channel: ChannelId,
+        _client_can_do: bool,
+        _session: &mut Session,
+    ) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
+    async fn exit_status(
+        &mut self,
+        _channel: ChannelId,
+        _exit_status: u32,
+        _session: &mut Session,
+    ) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
+    async fn exit_signal(
+        &mut self,
+        _channel: ChannelId,
+        _signal_name: Sig,
+        _core_dumped: bool,
+        _error_message: &str,
+        _lang_tag: &str,
+        _session: &mut Session,
+    ) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
+    async fn window_adjusted(
+        &mut self,
+        _channel: ChannelId,
+        _new_size: u32,
+        _session: &mut Session,
+    ) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
+    fn adjust_window(&mut self, _channel: ChannelId, window: u32) -> u32 {
+        window
+    }
+
+    async fn openssh_ext_host_keys_announced(
+        &mut self,
+        _keys: Vec<PublicKey>,
+        _session: &mut Session,
+    ) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
     async fn disconnected(
         &mut self,
-        reason: russh::client::DisconnectReason<Self::Error>,
+        reason: DisconnectReason<Self::Error>,
     ) -> Result<(), Self::Error> {
         match reason {
             DisconnectReason::ReceivedDisconnect(disconnect_info) => {
@@ -263,7 +450,7 @@ mod tests {
     use crate::client_side::{
         context::ConnectionContext,
         error::ClientError,
-        handler::{self, ConnectionHandler},
+        handler::ConnectionHandler,
         known_hosts::HostKeyPolicy,
         target::TargetIdentity,
     };
@@ -317,7 +504,7 @@ mod tests {
 
         assert!(matches!(
             handler.check_server_key(&other_key).await,
-            Err(ClientError::HostKeyChanged { host, port, path, line }) if host == "router.example1.com"
+            Err(ClientError::HostKeyChanged { host, .. }) if host == "router.example1.com"
         ));
     }
 
