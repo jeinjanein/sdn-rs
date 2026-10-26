@@ -169,4 +169,24 @@ mod tests {
             Ok(_) => panic!("client accepted a direct-tcpip channel"),
         }
     }
+
+    #[tokio::test]
+    async fn client_rejects_server_opened_direct_streamlocal_channel() {
+        let (_client, server_handle) = authenticated_connection().await;
+
+        let result = timeout(
+            CHANNEL_OPEN_TIMEOUT,
+            server_handle.channel_open_direct_streamlocal("/var/test.sock"),
+        )
+        .await
+        .expect("client should answer the channel-open request");
+
+        match result {
+            Err(russh::Error::ChannelOpenFailure(
+                russh::ChannelOpenFailure::AdministrativelyProhibited,
+            )) => {}
+            Err(error) => panic!("expected an administrative refusal, got error {error:?}"),
+            Ok(_) => panic!("client accepted a direct-streamlocal channel"),
+        }
+    }
 }
