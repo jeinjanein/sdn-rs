@@ -189,4 +189,24 @@ mod tests {
             Ok(_) => panic!("client accepted a direct-streamlocal channel"),
         }
     }
+
+    #[tokio::test]
+    async fn client_rejects_server_opened_x11_channel() {
+        let (_client, server_handle) = authenticated_connection().await;
+
+        let result = timeout(
+            CHANNEL_OPEN_TIMEOUT,
+            server_handle.channel_open_x11("192.0.2.10", 50000),
+        )
+        .await
+        .expect("client should answer the channel-open request");
+
+        match result {
+            Err(russh::Error::ChannelOpenFailure(
+                russh::ChannelOpenFailure::AdministrativelyProhibited,
+            )) => {}
+            Err(error) => panic!("expected an administrative refusal, got error {error:?}"),
+            Ok(_) => panic!("client accepted an x11 channel"),
+        }
+    }
 }
