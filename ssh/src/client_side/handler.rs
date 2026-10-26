@@ -266,14 +266,14 @@ impl russh::client::Handler for ConnectionHandler {
 
     async fn server_channel_open_forwarded_streamlocal(
         &mut self,
-        _channel: Channel<Msg>,
+        channel: Channel<Msg>,
         _socket_path: &str,
         reply: ChannelOpenHandle,
         _session: &mut Session,
     ) -> Result<(), Self::Error> {
-        reply
-            .reject(ChannelOpenFailure::AdministrativelyProhibited)
+        self.reject_server_opened_channel(channel.id(), "forwarded-streamlocal", reply)
             .await;
+
         Ok(())
     }
 

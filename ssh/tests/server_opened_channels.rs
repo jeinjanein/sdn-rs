@@ -9,7 +9,6 @@ use ssh::client_side::{
     connection::create_ssh_connection_from_custom_stream, known_hosts::HostKeyPolicy,
     target::TargetIdentity,
 };
-use tokio::time::timeout;
 
 const TEST_HOST_KEY_SEED: [u8; 32] = [7; 32];
 
@@ -58,10 +57,10 @@ async fn authenticated_connection() -> (SshClient, server::Handle) {
     let mut client = client.expect("client should complete the handshake");
 
     let auth_result = client
-    .handle_mut()
-    .authenticate_none("test")
-    .await
-    .expect("authentication request should complete");
+        .handle_mut()
+        .authenticate_none("test")
+        .await
+        .expect("authentication request should complete");
 
     assert!(
         auth_result.success(),
@@ -71,21 +70,49 @@ async fn authenticated_connection() -> (SshClient, server::Handle) {
     (client, server_session.handle())
 }
 
+#[cfg(test)]
+mod tests {
+    use tokio::time::timeout;
 
-#[tokio::test]
-async fn client_rejects_server_opened_forwared_tcpip_channel() {
-    let (_client, server_handle) = authenticated_connection().await;
+    use crate::{CHANNEL_OPEN_TIMEOUT, authenticated_connection};
 
-    let result = timeout(
-        CHANNEL_OPEN_TIMEOUT,
-    server_handle.channel_open_forwarded_tcpip("127.0.0.1", 8080, "192.0.2.10", 50000))
-    .await
-    .expect("client should answer the channel-open request");
+    #[tokio::test]
+    async fn client_rejects_server_opened_forwared_tcpip_channel() {
+        let (_client, server_handle) = authenticated_connection().await;
 
-    match result {
-        Err(russh::Error::ChannelOpenFailure(russh::ChannelOpenFailure::AdministrativelyProhibited)) => {},
-        Err(error) => panic!("expected an administrative refusal, got error {error:?}"),
-        Ok(_) => panic!("client accepted a forwared-tcpip channel"),
+        let result = timeout(
+            CHANNEL_OPEN_TIMEOUT,
+            server_handle.channel_open_forwarded_tcpip("127.0.0.1", 8080, "192.0.2.10", 50000),
+        )
+        .await
+        .expect("client should answer the channel-open request");
+
+        match result {
+            Err(russh::Error::ChannelOpenFailure(
+                russh::ChannelOpenFailure::AdministrativelyProhibited,
+            )) => {}
+            Err(error) => panic!("expected an administrative refusal, got error {error:?}"),
+            Ok(_) => panic!("client accepted a forwared-tcpip channel"),
+        }
     }
 
+    #[tokio::test]
+    async fn client_rejects_server_opened_forwarded_streamlocal_channel() {
+        let (_cient, server_handle) = authenticated_connection().await;
+
+        let result = timeout(
+            CHANNEL_OPEN_TIMEOUT,
+            server_handle.channel_open_forwarded_streamlocal("/tmp/forwaded.sock"),
+        )
+        .await
+        .expect("client should answer the channel-open request");
+
+        match result {
+            Err(russh::Error::ChannelOpenFailure(
+                russh::ChannelOpenFailure::AdministrativelyProhibited,
+            )) => {}
+            Err(error) => panic!("expected an administrative refusal, got error {error:?}"),
+            Ok(_) => panic!("client accepted a forwarded-stream local channel"),
+        }
+    }
 }
