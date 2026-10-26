@@ -299,13 +299,13 @@ impl russh::client::Handler for ConnectionHandler {
 
     async fn server_channel_open_unknown(
         &mut self,
-        _channel: Channel<Msg>,
+        channel: Channel<Msg>,
         reply: ChannelOpenHandle,
         _session: &mut Session,
     ) -> Result<(), Self::Error> {
-        reply
-            .reject(ChannelOpenFailure::AdministrativelyProhibited)
+        self.reject_server_opened_channel(channel.id(), "unknown", reply)
             .await;
+
         Ok(())
     }
 
