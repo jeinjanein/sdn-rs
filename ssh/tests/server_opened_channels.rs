@@ -23,7 +23,7 @@ struct TestServer;
 impl server::Handler for TestServer {
     type Error = russh::Error;
 
-    async fn auth_none(&mut self, user: &str) -> Result<server::Auth, Self::Error> {
+    async fn auth_none(&mut self, _user: &str) -> Result<server::Auth, Self::Error> {
         Ok(Auth::Accept)
     }
 }
@@ -113,6 +113,23 @@ mod tests {
             )) => {}
             Err(error) => panic!("expected an administrative refusal, got error {error:?}"),
             Ok(_) => panic!("client accepted a forwarded-stream local channel"),
+        }
+    }
+
+    #[tokio::test]
+    async fn client_rejects_server_opened_agent_forward_channel() {
+        let (_client, server_handle) = authenticated_connection().await;
+
+        let result = timeout(CHANNEL_OPEN_TIMEOUT, server_handle.channel_open_agent())
+            .await
+            .expect("client should answer the channel-open request");
+
+        match result {
+            Err(russh::Error::ChannelOpenFailure(
+                russh::ChannelOpenFailure::AdministrativelyProhibited,
+            )) => {}
+            Err(error) => panic!("expected an administrative refusal, got error {error:?}"),
+            Ok(_) => panic!("client accepted an auth-agent channel"),
         }
     }
 }
