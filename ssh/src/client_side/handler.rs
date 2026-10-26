@@ -1,7 +1,9 @@
 use crate::client_side::error::ClientError;
 use crate::client_side::{context::ConnectionContext, known_hosts::verify_server_key};
 use russh::client::{ChannelOpenHandle, Msg, Session};
-use russh::{Channel, ChannelId, ChannelOpenFailure, Sig, client::DisconnectReason, keys::PublicKey};
+use russh::{
+    Channel, ChannelId, ChannelOpenFailure, Sig, client::DisconnectReason, keys::PublicKey,
+};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
@@ -233,7 +235,7 @@ impl russh::client::Handler for ConnectionHandler {
         _originator_port: u32,
         reply: ChannelOpenHandle,
         _session: &mut Session,
-    ) -> Result<(), Self::Error>{
+    ) -> Result<(), Self::Error> {
         reply
             .reject(ChannelOpenFailure::AdministrativelyProhibited)
             .await;
@@ -448,11 +450,8 @@ mod tests {
     use russh::{client::Handler, keys::PublicKey};
 
     use crate::client_side::{
-        context::ConnectionContext,
-        error::ClientError,
-        handler::ConnectionHandler,
-        known_hosts::HostKeyPolicy,
-        target::TargetIdentity,
+        context::ConnectionContext, error::ClientError, handler::ConnectionHandler,
+        known_hosts::HostKeyPolicy, target::TargetIdentity,
     };
 
     const KNOWN_KEY: &str = concat!(
