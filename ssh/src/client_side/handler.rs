@@ -29,6 +29,28 @@ impl ConnectionHandler {
     pub fn connection_context(&self) -> Arc<ConnectionContext> {
         Arc::clone(&self.connection_context)
     }
+
+    /// Refuses a channel that the server tried to open toward this client.
+    /// The refusal is queued for the session loop, which sends it after
+    /// the calling callback returns `Ok(())`.
+    async fn reject_server_opened_channel(
+        &self,
+        channel_id: ChannelId,
+        channel_type: &str,
+        reply: ChannelOpenHandle,
+    ) {
+        reply
+            .reject(ChannelOpenFailure::AdministrativelyProhibited)
+            .await;
+
+        warn!(
+            connection_id = self.connection_id(),
+            peer_addr = ?self.peer_addr(),
+            channel_id = ?channel_id,
+            channel_type,
+            "server-opened SSH channel rejected"
+        );
+    }
 }
 
 impl russh::client::Handler for ConnectionHandler {
@@ -228,7 +250,7 @@ impl russh::client::Handler for ConnectionHandler {
 
     async fn server_channel_open_forwarded_tcpip(
         &mut self,
-        _channel: Channel<Msg>,
+        channel: Channel<Msg>,
         _connected_address: &str,
         _connected_port: u32,
         _originator_address: &str,
@@ -236,9 +258,9 @@ impl russh::client::Handler for ConnectionHandler {
         reply: ChannelOpenHandle,
         _session: &mut Session,
     ) -> Result<(), Self::Error> {
-        reply
-            .reject(ChannelOpenFailure::AdministrativelyProhibited)
+        self.reject_server_opened_channel(channel.id(), "forwared-tcpip", reply)
             .await;
+
         Ok(())
     }
 
