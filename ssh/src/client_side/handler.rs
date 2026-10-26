@@ -323,7 +323,7 @@ impl russh::client::Handler for ConnectionHandler {
 
     async fn server_channel_open_direct_tcpip(
         &mut self,
-        _channel: Channel<Msg>,
+        channel: Channel<Msg>,
         _host_to_connect: &str,
         _port_to_connect: u32,
         _originator_address: &str,
@@ -331,9 +331,9 @@ impl russh::client::Handler for ConnectionHandler {
         reply: ChannelOpenHandle,
         _session: &mut Session,
     ) -> Result<(), Self::Error> {
-        reply
-            .reject(ChannelOpenFailure::AdministrativelyProhibited)
+        self.reject_server_opened_channel(channel.id(), "direct-tcpip", reply)
             .await;
+
         Ok(())
     }
 
