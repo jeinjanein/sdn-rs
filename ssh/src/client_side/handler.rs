@@ -311,13 +311,13 @@ impl russh::client::Handler for ConnectionHandler {
 
     async fn server_channel_open_session(
         &mut self,
-        _channel: Channel<Msg>,
+        channel: Channel<Msg>,
         reply: ChannelOpenHandle,
         _session: &mut Session,
     ) -> Result<(), Self::Error> {
-        reply
-            .reject(ChannelOpenFailure::AdministrativelyProhibited)
+        self.reject_server_opened_channel(channel.id(), "session", reply)
             .await;
+
         Ok(())
     }
 
