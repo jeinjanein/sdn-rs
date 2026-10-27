@@ -1,8 +1,9 @@
 use std::{sync::Arc, time::Duration};
 
 use anyhow::Context;
-use russh::keys::{HashAlg, load_public_key};
+use russh::keys::{HashAlg, load_public_key, load_secret_key};
 use ssh::client_side::{
+    client_key::load_client_private_key,
     config::create_client_config,
     connection::{create_ssh_connection, create_tcp_connection, resolve_target_hostname},
     error::ClientError,
@@ -18,6 +19,8 @@ const TARGET_HOST_NAME: &str = "127.0.0.1";
 const TARGET_PORT: u16 = 2222;
 
 const DEFAULT_PINNED_KEY_PATH: &str = "./keys/host_ed25519_key.pub";
+
+const DEFAULT_CLIENT_KEY_PATH: &str = "./keys/admin_ed25519_key";
 
 const SSH_HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(10);
 
@@ -51,6 +54,21 @@ async fn main() -> anyhow::Result<()> {
         path = %pinned_key_path,
         fingerprint = %pinned_key.fingerprint(HashAlg::Sha256),
         "stage 1: pinned server public key loaded"
+    );
+
+    let client_key_path = std::env::args()
+        .nth(2)
+        .unwrap_or_else(|| DEFAULT_CLIENT_KEY_PATH.to_string());
+
+    let client_key = load_client_private_key(&client_key_path).with_context(|| {
+        format!("stage 1 failed: cannot load client private key from {client_key_path}")
+    })?;
+
+    info!(
+        path = %client_key_path,
+        algorithm = %client_key.algorithm(),
+        fingerprint = %client_key.fingerprint(HashAlg::Sha256),
+        "stage 1: client private key loaded"
     );
 
     let config = Arc::new(

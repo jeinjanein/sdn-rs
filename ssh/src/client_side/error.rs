@@ -61,3 +61,21 @@ pub enum ClientError {
         source: std::io::Error,
     },
 }
+
+#[derive(Debug, Error)]
+pub enum ClientKeyError {
+    #[error("cannot open private key file: {source}")]
+    Open {
+        #[source]
+        source: std::io::Error,
+    },
+
+    #[error("cannot read OpenSSH private key: {source}")]
+    Read {
+        #[source]
+        source: russh::keys::ssh_key::Error,
+    },
+
+    #[error("private key is encrypted, and passphrase are not supported yet")]
+    Encrypted,
+}
