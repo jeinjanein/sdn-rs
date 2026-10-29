@@ -569,7 +569,9 @@ impl russh::server::Handler for ConnectionHandler {
             return Ok(());
         };
 
-        channel_data.append_message_to_buffer(data);
+        channel_data
+            .framing_decoder_mut()
+            .append_message_to_buffer(data);
 
         info!(
             connection_id = self.connection_id,

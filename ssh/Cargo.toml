@@ -17,6 +17,7 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
+netconf = {path = "../netconf"}
 anyhow.workspace = true
 bytes.workspace = true
 russh.workspace = true
@@ -26,6 +27,7 @@ tracing-subscriber.workspace = true
 tokio.workspace = true
 argon2.workspace = true
 rand_core.workspace = true
+
 
 [dev-dependencies]
 rpassword.workspace = true

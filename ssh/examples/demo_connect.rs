@@ -181,9 +181,7 @@ async fn main() -> anyhow::Result<()> {
     .context("stage 6 failed: cannot send the netconf subsystem request")?;
 
     let netconf_channel = match subsystem_reply {
-        Some(ChannelMsg::Success) => {
-            session_channel
-        }
+        Some(ChannelMsg::Success) => session_channel,
 
         Some(ChannelMsg::Failure) => {
             bail!("stage 6 failed: the server refused the {NETCONF_SUBSYSTEM_NAME} subsystem");
@@ -207,7 +205,7 @@ async fn main() -> anyhow::Result<()> {
         subsystem = NETCONF_SUBSYSTEM_NAME,
         "stage 6: subsystem request accepted"
     );
-    
+
     // Stage 7: request SSH termination
     client
         .handle_mut()

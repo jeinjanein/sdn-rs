@@ -1023,6 +1023,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "netconf"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "thiserror",
+]
+
+[[package]]
 name = "nix"
 version = "0.31.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1775,6 +1783,7 @@ dependencies = [
  "anyhow",
  "argon2 0.5.3",
  "bytes",
+ "netconf",
  "rand_core 0.10.1",
  "rpassword",
  "russh",

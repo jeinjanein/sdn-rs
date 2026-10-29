@@ -1,6 +1,7 @@
 [workspace]
 members = [
-    "controller",
+    "controller", 
+    "netconf",
     "simulator",
     "ssh",
 ]
